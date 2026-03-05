@@ -1,38 +1,47 @@
-# To run and test the code you need to update 4 places:
-# 1. Change MY_EMAIL/MY_PASSWORD to your own details.
-# 2. Go to your email provider and make it allow less secure apps.
-# 3. Update the SMTP ADDRESS to match your email provider.
-# 4. Update birthdays.csv to contain today's month and day.
-# See the solution video in the 100 Days of Python Course for explainations.
-
-
-from datetime import datetime
-import pandas
-import random
-import smtplib
 import os
+import requests
+from dotenv import load_dotenv
+from twilio.rest import Client
 
-# import os and use it to get the Github repository secrets
-MY_EMAIL = os.environ.get("MY_EMAIL")
-MY_PASSWORD = os.environ.get("MY_PASSWORD")
+load_dotenv()
 
-today = datetime.now()
-today_tuple = (today.month, today.day)
+API_KEY = os.getenv("RAIN_API_KEY")
+# ini auth
+ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
-data = pandas.read_csv("birthdays.csv")
-birthdays_dict = {(data_row["month"], data_row["day"])                  : data_row for (index, data_row) in data.iterrows()}
-if today_tuple in birthdays_dict:
-    birthday_person = birthdays_dict[today_tuple]
-    file_path = f"letter_templates/letter_{random.randint(1, 3)}.txt"
-    with open(file_path) as letter_file:
-        contents = letter_file.read()
-        contents = contents.replace("[NAME]", birthday_person["name"])
+MY_LAT = -6.2369
+MY_LONG = 106.853
 
-    with smtplib.SMTP("YOUR EMAIL PROVIDER SMTP SERVER ADDRESS") as connection:
-        connection.starttls()
-        connection.login(MY_EMAIL, MY_PASSWORD)
-        connection.sendmail(
-            from_addr=MY_EMAIL,
-            to_addrs=birthday_person["email"],
-            msg=f"Subject:Happy Birthday!\n\n{contents}"
-        )
+params = {
+    "lat": MY_LAT,
+    "lon": MY_LONG,
+    "appid": API_KEY,
+    "cnt": 4
+}
+
+res = requests.get(
+    "https://api.openweathermap.org/data/2.5/forecast",
+    params=params
+)
+
+data = res.json()
+
+will_rain = False
+
+for forecast in data["list"]:
+    weather_id = forecast["weather"][0]["id"]
+    if weather_id < 700:
+        will_rain = True
+        break
+
+if will_rain:
+    client = Client(ACCOUNT_SID, AUTH_TOKEN)
+
+    message = client.messages.create(
+    from_="whatsapp:+14155238886",
+    body="It's going to rain today. Remember to bring an umbrella",
+    to="whatsapp:+6287776161712"
+    )
+
+    print("Rain alert sent!")
